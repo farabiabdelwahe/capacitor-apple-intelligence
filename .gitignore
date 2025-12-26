@@ -1,0 +1,11 @@
+node_modules/
+dist/
+ios/App/App.xcodeproj/project.xcworkspace/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/Pods/
+.DS_Store
+.env
+.idea/
+.vscode/
+coverage/
+*.log
