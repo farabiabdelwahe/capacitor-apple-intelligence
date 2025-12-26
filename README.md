@@ -4,12 +4,12 @@ A production-ready Capacitor v8 plugin that exposes **Apple Intelligence** with 
 
 ## Features
 
-- 🧠 **On-device AI** - Uses Apple's Foundation Models framework for local, private inference
-- 📋 **Schema-constrained output** - Guarantees JSON output matching your provided schema
-- 🔄 **Automatic retry** - Retries generation once if validation fails
-- ✅ **Runtime validation** - Validates output against JSON schema before returning
-- 🔒 **Privacy-first** - No network calls, all processing happens on-device
-- 📱 **iOS only** - Designed specifically for Apple Intelligence on iOS 26+
+- **On-device AI** - Uses Apple's Foundation Models framework for local, private inference
+- **Schema-constrained output** - Guarantees JSON output matching your provided schema
+- **Automatic retry** - Retries generation once if validation fails
+- **Runtime validation** - Validates output against JSON schema before returning
+- **Privacy-first** - No network calls, all processing happens on-device
+- **iOS only** - Designed specifically for Apple Intelligence on iOS 26+
 
 ## Requirements
 
@@ -18,7 +18,18 @@ A production-ready Capacitor v8 plugin that exposes **Apple Intelligence** with 
 - **Xcode 26+**
 - **Apple Silicon device** (iPhone 15 Pro or later, or M-series iPads)
 
-> ⚠️ **Note**: Apple Intelligence must be enabled on the device for this plugin to work.
+**Note**: Apple Intelligence must be enabled on the device for this plugin to work.
+
+## Example App
+
+A fully functional example app is included in the [`example/`](./example) directory. It demonstrates all plugin methods with a clean UI:
+
+- JSON generation with schema validation
+- Plain text generation
+- Language-specific text generation
+- Availability checking
+
+See the [example README](./example/README.md) for setup instructions.
 
 ## Installation
 
