@@ -9,3 +9,10 @@ ios/App/Pods/
 .vscode/
 coverage/
 *.log
+
+# Example app
+example/node_modules/
+example/ios/
+example/android/
+example/.capacitor/
+example/package-lock.json

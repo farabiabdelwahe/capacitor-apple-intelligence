@@ -1,0 +1,19 @@
+{
+    "name": "apple-intelligence-example",
+    "version": "1.0.0",
+    "description": "Example app for testing Capacitor Apple Intelligence plugin",
+    "scripts": {
+        "build": "echo 'No build step needed for static HTML'",
+        "open:ios": "npx cap open ios",
+        "sync": "npx cap sync",
+        "add:ios": "npx cap add ios"
+    },
+    "dependencies": {
+        "@capacitor/core": "^8.0.0",
+        "capacitor-apple-intelligence": "file:.."
+    },
+    "devDependencies": {
+        "@capacitor/cli": "^8.0.0",
+        "@capacitor/ios": "^8.0.0"
+    }
+}

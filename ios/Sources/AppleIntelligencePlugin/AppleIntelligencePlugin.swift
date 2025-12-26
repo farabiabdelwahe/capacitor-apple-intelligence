@@ -13,7 +13,8 @@ public class AppleIntelligencePlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "generate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "generateText", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "generateTextWithLanguage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "generateTextWithLanguage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkAvailability", returnType: CAPPluginReturnPromise)
     ]
     
     // MARK: - Implementation
@@ -204,6 +205,25 @@ public class AppleIntelligencePlugin: CAPPlugin, CAPBridgedPlugin {
                 "error": [
                     "code": "UNAVAILABLE",
                     "message": "Apple Intelligence requires iOS 26 or later."
+                ]
+            ])
+        }
+    }
+
+    /// Check if Apple Intelligence is available on this device
+    @objc func checkAvailability(_ call: CAPPluginCall) {
+        let availability = implementation.checkAvailability()
+        
+        if availability.available {
+            call.resolve([
+                "available": true
+            ])
+        } else {
+            call.resolve([
+                "available": false,
+                "error": availability.error?.asDictionary ?? [
+                    "code": "UNAVAILABLE",
+                    "message": "Apple Intelligence is not available on this device."
                 ]
             ])
         }

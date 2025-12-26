@@ -156,14 +156,14 @@ if (result.success) {
 
 ### Text Generation with Language
 
-Generate text in a specific language:
+Generate text in a specific language using either language codes or full names:
 
 ```typescript
 const result = await AppleIntelligence.generateTextWithLanguage({
   messages: [
     { role: "user", content: "Describe a beautiful sunset" }
   ],
-  language: "Spanish"
+  language: "es"  // or "Spanish"
 });
 
 if (result.success) {
@@ -172,7 +172,35 @@ if (result.success) {
 }
 ```
 
+Supported language codes: `en`, `es`, `fr`, `de`, `ja`, `zh`, `it`, `pt`, `ru`, `ar`, `ko`
+
 ## API
+
+### `checkAvailability()`
+
+Check if Apple Intelligence is available on the current device. **Call this first** before using other methods.
+
+#### Response
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `available` | `boolean` | Whether Apple Intelligence is available |
+| `error` | `GenerateError` | Error details (if unavailable) |
+
+#### Example
+
+```typescript
+const result = await AppleIntelligence.checkAvailability();
+
+if (result.available) {
+  console.log('Apple Intelligence is ready!');
+} else {
+  console.log('Not available:', result.error?.message);
+  // "Apple Intelligence requires iOS 26 or later..."
+}
+```
+
+---
 
 ### `generate(request)`
 
@@ -243,7 +271,7 @@ Generate plain text output in a specific language using Apple Intelligence.
 | Property | Type | Description |
 |----------|------|-------------|
 | `messages` | `Message[]` | Array of conversation messages |
-| `language` | `string` | Target language (e.g., "English", "Spanish", "French") |
+| `language` | `string` | Target language - supports codes ("en", "es", "de") or full names ("English", "Spanish", "German") |
 
 #### Response
 

@@ -177,6 +177,13 @@ export interface AppleIntelligencePlugin {
      * @returns Promise resolving to a text response with success/error
      */
     generateTextWithLanguage(request: GenerateTextWithLanguageRequest): Promise<GenerateTextResponse>;
+
+    /**
+     * Check if Apple Intelligence is available on this device.
+     * 
+     * @returns Promise resolving to availability status
+     */
+    checkAvailability(): Promise<AvailabilityResponse>;
 }
 
 /**
@@ -221,6 +228,21 @@ export interface GenerateTextResponse {
     /**
      * Error details on failure.
      * Only present when success is false.
+     */
+    error?: GenerateError;
+}
+
+/**
+ * Response for availability check.
+ */
+export interface AvailabilityResponse {
+    /**
+     * Whether Apple Intelligence is available on this device.
+     */
+    available: boolean;
+
+    /**
+     * Error details if unavailable.
      */
     error?: GenerateError;
 }

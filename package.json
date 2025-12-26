@@ -12,14 +12,14 @@
     "Package.swift",
     "*.podspec"
   ],
-  "author": "Anthropic Labs",
+  "author": "Farabi Abdelwahed",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anthropic-labs/capacitor-apple-intelligence.git"
+    "url": "git+https://github.com/farabiabdelwahe/capacitor-apple-intelligence.git"
   },
   "bugs": {
-    "url": "https://github.com/anthropic-labs/capacitor-apple-intelligence/issues"
+    "url": "https://github.com/farabiabdelwahe/capacitor-apple-intelligence/issues"
   },
   "keywords": [
     "capacitor",

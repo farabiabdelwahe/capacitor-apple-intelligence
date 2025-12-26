@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
 // MARK: - Error Types
 
 /// Error codes for Apple Intelligence plugin
@@ -212,7 +216,7 @@ public struct Message {
     // MARK: - Availability Check
     
     /// Check if Apple Intelligence is available on this device
-    @objc public func checkAvailability() -> (available: Bool, error: AppleIntelligenceError?) {
+    public func checkAvailability() -> (available: Bool, error: AppleIntelligenceError?) {
         // Runtime check for iOS 26+
         if #available(iOS 26, *) {
             // Foundation Models framework is available
@@ -357,14 +361,9 @@ public struct Message {
     ///   - systemPrompt: The system instructions
     ///   - userPrompt: The user query
     /// - Returns: The model's text response
-    @available(iOS 26, *)
+    @available(iOS 26, *) 
     private func callLanguageModel(systemPrompt: String, userPrompt: String) async throws -> String {
-        // Import Foundation Models framework
-        // This framework provides access to the on-device LLM powering Apple Intelligence
-        
         #if canImport(FoundationModels)
-        import FoundationModels
-        
         // Create a language model session
         let session = LanguageModelSession()
         
@@ -382,13 +381,13 @@ public struct Message {
         
         #else
         // Fallback for development/testing when FoundationModels isn't available
-        // This should never be reached on iOS 26+ devices
         throw AppleIntelligenceError(
             code: .unavailable,
             message: "FoundationModels framework not available"
         )
         #endif
     }
+
     
     /// Generate method that returns a dictionary suitable for Capacitor bridge
     @available(iOS 26, *)
@@ -472,12 +471,29 @@ public struct Message {
         let systemMessages = messages.filter { $0.role == .system }.map { $0.content }
         let userMessages = messages.filter { $0.role == .user }.map { $0.content }
         
+        // Convert language code to full language name for better model understanding
+        let languageMap: [String: String] = [
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "ja": "Japanese",
+            "zh": "Chinese",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "ar": "Arabic",
+            "ko": "Korean"
+        ]
+        
+        let fullLanguageName = languageMap[language.lowercased()] ?? language
+        
         var systemPrompt = systemMessages.joined(separator: "\n")
         // Append language instruction
         if !systemPrompt.isEmpty {
             systemPrompt += "\n\n"
         }
-        systemPrompt += "Please respond in \(language)."
+        systemPrompt += "IMPORTANT: You must respond ONLY in \(fullLanguageName). Do not use any other language."
         
         let userQuery = userMessages.joined(separator: "\n")
         

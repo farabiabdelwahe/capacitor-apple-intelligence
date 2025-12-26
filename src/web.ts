@@ -39,4 +39,14 @@ export class AppleIntelligenceWeb extends WebPlugin implements AppleIntelligence
       },
     };
   }
+
+  async checkAvailability(): Promise<any> {
+    return {
+      available: false,
+      error: {
+        code: 'UNAVAILABLE',
+        message: 'Apple Intelligence is only available on iOS 26+ devices with Apple Intelligence enabled.',
+      },
+    };
+  }
 }

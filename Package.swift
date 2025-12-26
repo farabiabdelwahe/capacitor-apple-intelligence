@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.iOS(.v14)],
     products: [
         .library(
-            name: "AppleIntelligencePlugin",
+            name: "CapacitorAppleIntelligence",
             targets: ["AppleIntelligencePlugin"])
     ],
     dependencies: [
