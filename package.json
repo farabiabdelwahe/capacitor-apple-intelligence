@@ -1,7 +1,7 @@
 {
   "name": "capacitor-apple-intelligence",
   "version": "1.0.0",
-  "description": "Capacitor v8 plugin for Apple Intelligence with schema-constrained JSON generation",
+  "description": "Capacitor v8 plugin for Apple Intelligence with schema-constrained JSON generation for structured AI responses",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",

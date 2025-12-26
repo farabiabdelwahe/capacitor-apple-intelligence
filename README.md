@@ -1,6 +1,6 @@
 # capacitor-apple-intelligence
 
-A production-ready Capacitor v8 plugin that exposes **Apple Intelligence** with **schema-constrained JSON generation**, behaving like Groq/Gemini `response_format: json_object`.
+A production-ready Capacitor v8 plugin that exposes **Apple Intelligence** with **schema-constrained JSON generation** for structured AI responses.
 
 ## Features
 
@@ -74,11 +74,11 @@ const result = await AppleIntelligence.generate({
   messages: [
     { 
       role: "system", 
-      content: "You are a helpful travel assistant specializing in packing lists." 
+      content: "You are a helpful assistant that organizes tasks." 
     },
     { 
       role: "user", 
-      content: "Suggest essential items for a week-long beach vacation" 
+      content: "Create a list of tasks for planning a project" 
     }
   ],
   response_format: {
@@ -88,12 +88,12 @@ const result = await AppleIntelligence.generate({
       items: {
         type: "object",
         properties: {
-          name: { type: "string" },
-          category: { type: "string" },
-          quantity: { type: "number" },
-          priority: { type: "string" }
+          title: { type: "string" },
+          description: { type: "string" },
+          priority: { type: "string" },
+          estimatedHours: { type: "number" }
         },
-        required: ["name", "category", "quantity"]
+        required: ["title", "priority"]
       }
     }
   }
