@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'CapacitorAppleIntelligence'
-  s.version = '1.0.0'
+  s.version = '1.0.2'
   s.summary = 'Capacitor plugin for Apple Intelligence with schema-constrained JSON generation'
   s.license = 'MIT'
   s.homepage = 'https://github.com/farabiabdelwahe/capacitor-apple-intelligence'
