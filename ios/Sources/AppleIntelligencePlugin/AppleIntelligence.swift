@@ -1,7 +1,12 @@
 import Foundation
+import UIKit
 
 #if canImport(FoundationModels)
 import FoundationModels
+#endif
+
+#if canImport(ImagePlayground)
+import ImagePlayground
 #endif
 
 // MARK: - Error Types
@@ -51,6 +56,35 @@ public struct Message {
     }
 }
 
+// MARK: - Image Generation Options
+
+/// Configuration options for image generation
+public struct ImageGenerationOptions {
+    /// JPEG compression quality (0.0 to 1.0)
+    public let compressionQuality: CGFloat
+    /// Maximum dimension for the output image
+    public let maxDimension: CGFloat?
+    /// Output format
+    public let format: ImageFormat
+    
+    public enum ImageFormat {
+        case png
+        case jpeg
+    }
+    
+    public static let `default` = ImageGenerationOptions(
+        compressionQuality: 0.8,
+        maxDimension: 1024,
+        format: .jpeg
+    )
+    
+    public init(compressionQuality: CGFloat = 0.8, maxDimension: CGFloat? = 1024, format: ImageFormat = .jpeg) {
+        self.compressionQuality = min(1.0, max(0.0, compressionQuality))
+        self.maxDimension = maxDimension
+        self.format = format
+    }
+}
+
 // MARK: - Main Implementation
 
 /// Apple Intelligence implementation class
@@ -60,6 +94,121 @@ public struct Message {
     // MARK: - Constants
     
     private let maxRetries = 1
+    private let maxImageCount = 10
+    private let minImageCount = 1
+    
+    // MARK: - Task Management
+    
+    /// Currently running generation tasks for cancellation support
+    private var activeTasks: [UUID: Task<Void, Never>] = [:]
+    private let taskLock = NSLock()
+    
+    /// Cancel all active generation tasks
+    public func cancelAllTasks() {
+        taskLock.lock()
+        defer { taskLock.unlock() }
+        for (_, task) in activeTasks {
+            task.cancel()
+        }
+        activeTasks.removeAll()
+    }
+    
+    /// Register a task for tracking
+    private func registerTask(_ task: Task<Void, Never>) -> UUID {
+        let id = UUID()
+        taskLock.lock()
+        activeTasks[id] = task
+        taskLock.unlock()
+        return id
+    }
+    
+    /// Unregister a completed task
+    private func unregisterTask(_ id: UUID) {
+        taskLock.lock()
+        activeTasks.removeValue(forKey: id)
+        taskLock.unlock()
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Convert schema dictionary to JSON string
+    private func schemaToString(_ schema: [String: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: schema, options: [.prettyPrinted, .sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return string
+    }
+    
+    /// Parse message dictionaries into Message objects
+    public func parseMessages(_ messages: [[String: String]]) -> [Message]? {
+        let parsed = messages.compactMap { dict -> Message? in
+            guard let roleStr = dict["role"],
+                  let content = dict["content"],
+                  let role = MessageRole(rawValue: roleStr) else { return nil }
+            return Message(role: role, content: content)
+        }
+        return parsed.isEmpty ? nil : parsed
+    }
+    
+    /// Safely escape string for JSON embedding
+    private func escapeForJson(_ string: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: string, options: []),
+              let escaped = String(data: data, encoding: .utf8) else {
+            // Fallback: basic escaping
+            return string
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+                .replacingOccurrences(of: "\r", with: "\\r")
+                .replacingOccurrences(of: "\t", with: "\\t")
+        }
+        // Remove surrounding quotes from JSON string serialization
+        return String(escaped.dropFirst().dropLast())
+    }
+    
+    /// Get full language name from locale code
+    private func fullLanguageName(from code: String) -> String {
+        // First try to get from system locale
+        if let name = Locale.current.localizedString(forLanguageCode: code.lowercased()) {
+            return name
+        }
+        
+        // Fallback map for common codes
+        let fallbackMap: [String: String] = [
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "ja": "Japanese",
+            "zh": "Chinese",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ru": "Russian",
+            "ar": "Arabic",
+            "ko": "Korean",
+            "nl": "Dutch",
+            "pl": "Polish",
+            "tr": "Turkish",
+            "vi": "Vietnamese",
+            "th": "Thai",
+            "hi": "Hindi",
+            "he": "Hebrew",
+            "id": "Indonesian",
+            "ms": "Malay",
+            "sv": "Swedish",
+            "da": "Danish",
+            "no": "Norwegian",
+            "fi": "Finnish",
+            "cs": "Czech",
+            "el": "Greek",
+            "hu": "Hungarian",
+            "ro": "Romanian",
+            "uk": "Ukrainian"
+        ]
+        
+        return fallbackMap[code.lowercased()] ?? code
+    }
     
     // MARK: - JSON Schema Validation
     
@@ -77,15 +226,48 @@ public struct Message {
         case "string":
             return (json is String, json is String ? nil : "Expected string, got \(type(of: json))")
         case "number", "integer":
-            return (json is NSNumber && !(json is Bool), 
-                    (json is NSNumber && !(json is Bool)) ? nil : "Expected number, got \(type(of: json))")
+            return validateNumber(json)
         case "boolean":
-            return (json is Bool, json is Bool ? nil : "Expected boolean, got \(type(of: json))")
+            return validateBoolean(json)
         case "null":
             return (json is NSNull, json is NSNull ? nil : "Expected null, got \(type(of: json))")
         default:
             return (false, "Unknown schema type: \(schemaType)")
         }
+    }
+    
+    /// Validate a number value (ensuring it's not actually a boolean)
+    private func validateNumber(_ json: Any) -> (valid: Bool, error: String?) {
+        guard let number = json as? NSNumber else {
+            return (false, "Expected number, got \(type(of: json))")
+        }
+        
+        // Use CFGetTypeID to properly distinguish booleans from numbers
+        let boolID = CFBooleanGetTypeID()
+        let typeID = CFGetTypeID(number as CFTypeRef)
+        
+        if typeID == boolID {
+            return (false, "Expected number, got boolean")
+        }
+        
+        return (true, nil)
+    }
+    
+    /// Validate a boolean value
+    private func validateBoolean(_ json: Any) -> (valid: Bool, error: String?) {
+        guard let number = json as? NSNumber else {
+            return (false, "Expected boolean, got \(type(of: json))")
+        }
+        
+        // Use CFGetTypeID to properly identify booleans
+        let boolID = CFBooleanGetTypeID()
+        let typeID = CFGetTypeID(number as CFTypeRef)
+        
+        if typeID == boolID {
+            return (true, nil)
+        }
+        
+        return (false, "Expected boolean, got number")
     }
     
     /// Validate an object against a schema
@@ -155,13 +337,7 @@ public struct Message {
     
     /// Build the system prompt with JSON schema instructions
     private func buildSystemPrompt(userSystemPrompt: String?, schema: [String: Any]) -> String {
-        let schemaJson: String
-        do {
-            let schemaData = try JSONSerialization.data(withJSONObject: schema, options: [.prettyPrinted, .sortedKeys])
-            schemaJson = String(data: schemaData, encoding: .utf8) ?? "{}"
-        } catch {
-            schemaJson = "{}"
-        }
+        let schemaJson = schemaToString(schema)
         
         var prompt = """
         You are a JSON generator. Your response must be ONLY valid JSON that matches the provided schema.
@@ -189,13 +365,7 @@ public struct Message {
     
     /// Build corrective prompt for retry attempts
     private func buildCorrectivePrompt(previousResponse: String, validationError: String, schema: [String: Any]) -> String {
-        let schemaJson: String
-        do {
-            let schemaData = try JSONSerialization.data(withJSONObject: schema, options: [.prettyPrinted, .sortedKeys])
-            schemaJson = String(data: schemaData, encoding: .utf8) ?? "{}"
-        } catch {
-            schemaJson = "{}"
-        }
+        let schemaJson = schemaToString(schema)
         
         return """
         The previous response was invalid JSON or did not match the required schema.
@@ -278,8 +448,13 @@ public struct Message {
         messages: [Message],
         schema: [String: Any]
     ) async -> Result<Any, AppleIntelligenceError> {
-        // Import Foundation Models at runtime
-        // Note: This uses the new Foundation Models framework available in iOS 26+
+        // Check for task cancellation
+        if Task.isCancelled {
+            return .failure(AppleIntelligenceError(
+                code: .nativeError,
+                message: "Generation was cancelled"
+            ))
+        }
         
         // Extract system and user messages
         let systemMessages = messages.filter { $0.role == .system }.map { $0.content }
@@ -296,6 +471,14 @@ public struct Message {
         var lastError = ""
         
         for attempt in 0...maxRetries {
+            // Check for cancellation between attempts
+            if Task.isCancelled {
+                return .failure(AppleIntelligenceError(
+                    code: .nativeError,
+                    message: "Generation was cancelled"
+                ))
+            }
+            
             do {
                 let response: String
                 
@@ -380,14 +563,24 @@ public struct Message {
         return response.content
         
         #else
-        // Fallback for development/testing when FoundationModels isn't available
-        throw AppleIntelligenceError(
-            code: .unavailable,
-            message: "FoundationModels framework not available"
-        )
+        // Mock fallback for development/testing
+        if systemPrompt.contains("You are a JSON generator") {
+            // JSON mock for generate() calls - using proper JSON escaping
+            let escapedQuery = escapeForJson(userPrompt)
+            return """
+            {
+                "mock_response": "This is a mocked JSON response from Apple Intelligence (Runtime not available)",
+                "original_query": "\(escapedQuery)"
+            }
+            """
+        } else {
+            // Return plain text for generateText() calls
+            return "This is a mocked response from Apple Intelligence (Runtime not available). User query was: \(userPrompt)"
+        }
         #endif
     }
 
+    // MARK: - Bridge Helpers
     
     /// Generate method that returns a dictionary suitable for Capacitor bridge
     @available(iOS 26, *)
@@ -395,17 +588,7 @@ public struct Message {
         messages: [[String: String]],
         schema: [String: Any]
     ) async -> [String: Any] {
-        // Convert raw dictionaries to Message objects
-        let parsedMessages = messages.compactMap { dict -> Message? in
-            guard let roleStr = dict["role"],
-                  let content = dict["content"],
-                  let role = MessageRole(rawValue: roleStr) else {
-                return nil
-            }
-            return Message(role: role, content: content)
-        }
-        
-        if parsedMessages.isEmpty {
+        guard let parsedMessages = parseMessages(messages) else {
             return [
                 "success": false,
                 "error": AppleIntelligenceError(
@@ -430,6 +613,7 @@ public struct Message {
             ]
         }
     }
+    
     /// Generate plain text output using Apple Intelligence
     /// - Parameters:
     ///   - messages: Array of conversation messages
@@ -438,6 +622,14 @@ public struct Message {
     public func generateText(
         messages: [Message]
     ) async -> Result<String, AppleIntelligenceError> {
+        // Check for task cancellation
+        if Task.isCancelled {
+            return .failure(AppleIntelligenceError(
+                code: .nativeError,
+                message: "Generation was cancelled"
+            ))
+        }
+        
         let systemMessages = messages.filter { $0.role == .system }.map { $0.content }
         let userMessages = messages.filter { $0.role == .user }.map { $0.content }
         
@@ -468,25 +660,19 @@ public struct Message {
         messages: [Message],
         language: String
     ) async -> Result<String, AppleIntelligenceError> {
+        // Check for task cancellation
+        if Task.isCancelled {
+            return .failure(AppleIntelligenceError(
+                code: .nativeError,
+                message: "Generation was cancelled"
+            ))
+        }
+        
         let systemMessages = messages.filter { $0.role == .system }.map { $0.content }
         let userMessages = messages.filter { $0.role == .user }.map { $0.content }
         
-        // Convert language code to full language name for better model understanding
-        let languageMap: [String: String] = [
-            "en": "English",
-            "es": "Spanish",
-            "fr": "French",
-            "de": "German",
-            "ja": "Japanese",
-            "zh": "Chinese",
-            "it": "Italian",
-            "pt": "Portuguese",
-            "ru": "Russian",
-            "ar": "Arabic",
-            "ko": "Korean"
-        ]
-        
-        let fullLanguageName = languageMap[language.lowercased()] ?? language
+        // Get full language name dynamically
+        let fullLanguageName = fullLanguageName(from: language)
         
         var systemPrompt = systemMessages.joined(separator: "\n")
         // Append language instruction
@@ -516,16 +702,7 @@ public struct Message {
     public func generateTextForBridge(
         messages: [[String: String]]
     ) async -> [String: Any] {
-        let parsedMessages = messages.compactMap { dict -> Message? in
-            guard let roleStr = dict["role"],
-                  let content = dict["content"],
-                  let role = MessageRole(rawValue: roleStr) else {
-                return nil
-            }
-            return Message(role: role, content: content)
-        }
-        
-        if parsedMessages.isEmpty {
+        guard let parsedMessages = parseMessages(messages) else {
             return [
                 "success": false,
                 "error": AppleIntelligenceError(
@@ -557,16 +734,7 @@ public struct Message {
         messages: [[String: String]],
         language: String
     ) async -> [String: Any] {
-        let parsedMessages = messages.compactMap { dict -> Message? in
-            guard let roleStr = dict["role"],
-                  let content = dict["content"],
-                  let role = MessageRole(rawValue: roleStr) else {
-                return nil
-            }
-            return Message(role: role, content: content)
-        }
-        
-        if parsedMessages.isEmpty {
+        guard let parsedMessages = parseMessages(messages) else {
             return [
                 "success": false,
                 "error": AppleIntelligenceError(
@@ -583,6 +751,182 @@ public struct Message {
             return [
                 "success": true,
                 "content": content
+            ]
+        case .failure(let error):
+            return [
+                "success": false,
+                "error": error.asDictionary
+            ]
+        }
+    }
+    
+    // MARK: - Image Generation
+    
+    /// Supported image styles for Apple's on-device Image Playground
+    /// Note: Photorealistic images are NOT supported by Apple's on-device API
+    public static let supportedImageStyles = ["animation", "illustration", "sketch"]
+    
+    /// Generate images using Apple Intelligence
+    /// - Parameters:
+    ///   - prompt: Description of the image
+    ///   - style: Style for the image. Supported values: "animation" (default), "illustration", "sketch".
+    ///            Note: "photorealistic" and other styles are NOT supported by Apple's on-device Image Playground API.
+    ///   - count: Number of images (clamped to 1-10)
+    ///   - sourceImage: Optional source image for face-based generation. Required when prompt involves generating images of people.
+    ///   - options: Image generation options for compression and sizing
+    /// - Returns: Result containing array of base64 image strings or error
+    @available(iOS 26, *)
+    public func generateImage(
+        prompt: String,
+        style: String?,
+        count: Int,
+        sourceImage: UIImage? = nil,
+        options: ImageGenerationOptions = .default
+    ) async -> Result<[String], AppleIntelligenceError> {
+        // Check for task cancellation
+        if Task.isCancelled {
+            return .failure(AppleIntelligenceError(
+                code: .nativeError,
+                message: "Image generation was cancelled"
+            ))
+        }
+        
+        // Validate style parameter
+        if let styleStr = style?.lowercased(), !styleStr.isEmpty {
+            if !Self.supportedImageStyles.contains(styleStr) {
+                return .failure(AppleIntelligenceError(
+                    code: .nativeError,
+                    message: "Unsupported image style: '\(style ?? "")'. Apple's on-device Image Playground only supports: \(Self.supportedImageStyles.joined(separator: ", ")). Note: Photorealistic images are not supported by Apple's native API."
+                ))
+            }
+        }
+        
+        // Validate and clamp count
+        let validatedCount = max(minImageCount, min(count, maxImageCount))
+        
+        #if canImport(ImagePlayground)
+        do {
+            let creator = try await ImageCreator()
+            
+            // Build concepts array
+            var concepts: [ImagePlaygroundConcept] = [.text(prompt)]
+            
+            // If source image provided, save to temp URL and add as image concept
+            if let source = sourceImage, let jpegData = source.jpegData(compressionQuality: 0.9) {
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("source_\(UUID().uuidString).jpg")
+                try jpegData.write(to: tempURL)
+                if let imageConcept = ImagePlaygroundConcept.image(tempURL) {
+                    concepts.append(imageConcept)
+                }
+            }
+            
+            // Map style string to ImagePlaygroundStyle enum
+            let imageStyle: ImagePlaygroundStyle
+            switch style?.lowercased() {
+            case "illustration": imageStyle = .illustration
+            case "sketch": imageStyle = .sketch
+            default: imageStyle = .animation  // Default to animation
+            }
+            
+            var base64Images: [String] = []
+            
+            for try await createdImage in creator.images(for: concepts, style: imageStyle, limit: validatedCount) {
+                // Check for cancellation during image generation
+                if Task.isCancelled {
+                    return .failure(AppleIntelligenceError(
+                        code: .nativeError,
+                        message: "Image generation was cancelled"
+                    ))
+                }
+                
+                var uiImage = UIImage(cgImage: createdImage.cgImage)
+                
+                // Resize if needed
+                if let maxDim = options.maxDimension {
+                    uiImage = resizeImage(uiImage, maxDimension: maxDim)
+                }
+                
+                // Compress based on format
+                let data: Data?
+                switch options.format {
+                case .png:
+                    data = uiImage.pngData()
+                case .jpeg:
+                    data = uiImage.jpegData(compressionQuality: options.compressionQuality)
+                }
+                
+                if let imageData = data {
+                    base64Images.append(imageData.base64EncodedString())
+                }
+            }
+            
+            if base64Images.isEmpty {
+                return .failure(AppleIntelligenceError(code: .nativeError, message: "No images were generated"))
+            }
+            return .success(base64Images)
+        } catch let error as NSError {
+            // Provide more helpful error message for face-related errors
+            let errorMessage = error.localizedDescription
+            if errorMessage.lowercased().contains("face") || errorMessage.lowercased().contains("person") || errorMessage.lowercased().contains("source image") {
+                return .failure(AppleIntelligenceError(
+                    code: .nativeError,
+                    message: "This prompt requires generating images of people. Please provide a source image containing a face using the 'sourceImage' parameter, or modify your prompt to avoid generating human faces."
+                ))
+            }
+            return .failure(AppleIntelligenceError(code: .nativeError, message: "Image generation failed: \(errorMessage)"))
+        }
+        #else
+        return .failure(AppleIntelligenceError(code: .unavailable, message: "ImagePlayground not available"))
+        #endif
+    }
+    
+    /// Resize image to fit within maximum dimension while maintaining aspect ratio
+    private func resizeImage(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        
+        // Check if resizing is needed
+        guard size.width > maxDimension || size.height > maxDimension else {
+            return image
+        }
+        
+        let ratio = min(maxDimension / size.width, maxDimension / size.height)
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    /// Generate image bridge helper
+    @available(iOS 26, *)
+    public func generateImageForBridge(
+        prompt: String,
+        style: String?,
+        count: Int,
+        sourceImageBase64: String? = nil,
+        compressionQuality: CGFloat? = nil
+    ) async -> [String: Any] {
+        let options = ImageGenerationOptions(
+            compressionQuality: compressionQuality ?? 0.8,
+            maxDimension: 1024,
+            format: .jpeg
+        )
+        
+        // Decode source image from base64 if provided
+        var sourceImage: UIImage? = nil
+        if let base64String = sourceImageBase64,
+           let imageData = Data(base64Encoded: base64String) {
+            sourceImage = UIImage(data: imageData)
+        }
+        
+        let result = await generateImage(prompt: prompt, style: style, count: count, sourceImage: sourceImage, options: options)
+        
+        switch result {
+        case .success(let images):
+            return [
+                "success": true,
+                "images": images
             ]
         case .failure(let error):
             return [

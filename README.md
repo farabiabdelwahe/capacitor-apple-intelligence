@@ -42,6 +42,18 @@ npx cap sync
 
 ### Basic Example
 
+First, check if Apple Intelligence is available:
+
+```typescript
+const availability = await AppleIntelligence.checkAvailability();
+if (!availability.available) {
+  console.error("Apple Intelligence not available");
+  return;
+}
+```
+
+Then generate JSON:
+
 ```typescript
 import { AppleIntelligence } from 'capacitor-apple-intelligence';
 
@@ -181,7 +193,35 @@ if (result.success) {
   console.log(result.content);
   // "El atardecer pinta el cielo con tonos dorados y rosados..."
 }
+if (result.success) {
+  console.log(result.content);
+  // "El atardecer pinta el cielo con tonos dorados y rosados..."
+}
 ```
+
+### Image Generation
+
+Generate images from text prompts:
+
+```typescript
+const result = await AppleIntelligence.generateImage({
+  prompt: "A futuristic city with flying cars",
+  style: "animation",       // Optional: "animation" (default), "illustration", "sketch"
+  count: 1,                 // Optional: Defaults to 1
+  sourceImage: base64String // Optional: Required for face-based generation
+});
+
+if (result.success && result.images) {
+  result.images.forEach(base64Image => {
+    // Display image
+    const img = document.createElement('img');
+    img.src = `data:image/png;base64,${base64Image}`;
+    document.body.appendChild(img);
+  });
+}
+```
+
+**Note**: When your prompt involves generating images of people, you **must** provide a `sourceImage` containing a clearly visible face. This is a requirement of Apple's Image Playground API. The source image should be passed as a base64-encoded string.
 
 Supported language codes: `en`, `es`, `fr`, `de`, `ja`, `zh`, `it`, `pt`, `ru`, `ar`, `ko`
 
@@ -211,7 +251,8 @@ if (result.available) {
 }
 ```
 
----
+
+
 
 ### `generate(request)`
 

@@ -49,4 +49,15 @@ export class AppleIntelligenceWeb extends WebPlugin implements AppleIntelligence
       },
     };
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async generateImage(_request: unknown): Promise<any> {
+    return {
+      success: false,
+      error: {
+        code: 'UNAVAILABLE',
+        message: 'Apple Intelligence is only available on iOS 26+ devices with Apple Intelligence enabled.',
+      },
+    };
+  }
 }

@@ -239,6 +239,35 @@
       </select>
     </div>
 
+    <div class="section">
+      <label for="imageStyle">Image Style (for generateImage)</label>
+      <select id="imageStyle">
+        <option value="animation">Animation (Default)</option>
+        <option value="illustration">Illustration</option>
+        <option value="sketch">Sketch</option>
+      </select>
+      <p class="info-text" style="margin-top: 6px; font-size: 12px; color: #666;">
+        Note: Apple's on-device Image Playground only supports these 3 styles.
+      </p>
+    </div>
+
+    <div class="section">
+      <label for="sourceImage">Source Image (Optional - for face-based generation)</label>
+      <input type="file" id="sourceImage" accept="image/*" onchange="previewSourceImage(event)"
+        style="padding: 8px; background: #f8f9fa;">
+      <p class="info-text" style="margin-top: 6px; font-size: 12px; color: #666;">
+        Required when generating images of people. Select a photo with a visible face.
+      </p>
+      <div id="sourceImagePreview" style="margin-top: 10px; display: none;">
+        <img id="sourceImagePreviewImg"
+          style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #e0e0e0;">
+        <button onclick="clearSourceImage()"
+          style="display: block; margin-top: 8px; padding: 6px 12px; font-size: 12px; background: #dc3545;">
+          ✕ Clear Image
+        </button>
+      </div>
+    </div>
+
     <div class="button-group">
       <button onclick="testGenerateJSON()">
         📋 Generate JSON
@@ -249,11 +278,15 @@
       <button onclick="testGenerateTextWithLanguage()">
         🌍 Generate Text (Language)
       </button>
+      <button onclick="testGenerateImage()">
+        🎨 Generate Image
+      </button>
     </div>
 
     <div id="output" class="output" style="display: none;">
       <h3>Result</h3>
       <pre id="result"></pre>
+      <div id="imageResult" style="margin-top: 15px; display: none;"></div>
     </div>
   </div>
 

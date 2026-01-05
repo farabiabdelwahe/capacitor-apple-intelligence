@@ -184,6 +184,14 @@ export interface AppleIntelligencePlugin {
      * @returns Promise resolving to availability status
      */
     checkAvailability(): Promise<AvailabilityResponse>;
+
+    /**
+     * Generate an image based on the provided prompt using Apple Intelligence.
+     * 
+     * @param request - The generation request containing prompt and options
+     * @returns Promise resolving to an image response with success/error and base64 image data
+     */
+    generateImage(request: GenerateImageRequest): Promise<GenerateImageResponse>;
 }
 
 /**
@@ -243,6 +251,57 @@ export interface AvailabilityResponse {
 
     /**
      * Error details if unavailable.
+     */
+    error?: GenerateError;
+}
+
+/**
+ * Request payload for image generation.
+ */
+export interface GenerateImageRequest {
+    /**
+     * The prompt describing the image to generate.
+     */
+    prompt: string;
+
+    /**
+     * Optional style guide for generation.
+     * Supported values: "animation" (default), "illustration", "sketch".
+     * Note: "photorealistic" is NOT supported by Apple's on-device Image Playground.
+     */
+    style?: string;
+
+    /**
+     * Optional number of images to generate. Defaults to 1. Maximum 10.
+     */
+    count?: number;
+
+    /**
+     * Optional base64-encoded source image for face-based generation.
+     * Required when the prompt involves generating images of people/faces.
+     * The image should contain a clearly visible person's face.
+     */
+    sourceImage?: string;
+}
+
+/**
+ * Response for image generation.
+ */
+export interface GenerateImageResponse {
+    /**
+     * Whether the generation was successful.
+     */
+    success: boolean;
+
+    /**
+     * Array of base64 encoded images strings.
+     * Only present when success is true.
+     */
+    images?: string[];
+
+    /**
+     * Error details on failure.
+     * Only present when success is false.
      */
     error?: GenerateError;
 }
