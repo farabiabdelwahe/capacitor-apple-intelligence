@@ -16,3 +16,5 @@ example/ios/
 example/android/
 example/.capacitor/
 example/package-lock.json
+
+.swiftpm/xcode/xcuserdata/farabia.xcuserdatad/xcschemes
